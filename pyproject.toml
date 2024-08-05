@@ -10,6 +10,7 @@ python = "^3.12"
 fastapi = "^0.111.1"
 sqlalchemy = "^2.0"
 pg8000 = "^1.29"
+sqlmodel = "^0.0.21"
 
 
 [build-system]
