@@ -1,27 +1,52 @@
-from typing import Optional
+from typing import AsyncIterator
+
+
 from sqlmodel import Field, SQLModel, create_engine, Session, select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
-# Import โมดูลที่จำเป็นจากโฟลเดอร์ปัจจุบัน
-from .items import DBItem 
-from .merchants import DBMerchant
-from .wallets import DBWallet
-from .transactions import DBTransaction
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.orm import sessionmaker
 
-# กำหนดการตั้งค่าเชื่อมต่อฐานข้อมูล
+
+from . import items
+from . import merchants
+from . import users
+
+from .items import *
+from .merchants import *
+from .users import *
+
+
 connect_args = {}
 
-# สร้าง engine สำหรับเชื่อมต่อกับฐานข้อมูล PostgreSQL
-engine = create_engine(
-    "postgresql+pg8000://postgres:123456@localhost/digimondb",
-    echo=True,
-    connect_args=connect_args,
-)
+engine = None
 
-# ฟังก์ชันสำหรับสร้างตารางในฐานข้อมูล
-def init_db():
-    SQLModel.metadata.create_all(engine)
 
-# ฟังก์ชันสำหรับการใช้ session ในการเชื่อมต่อฐานข้อมูล
-def get_session():
-    with Session(engine) as session:
+def init_db(settings):
+    global engine
+
+    engine = create_async_engine(
+        settings.SQLDB_URL,
+        echo=True,
+        future=True,
+        connect_args=connect_args,
+    )
+
+
+async def recreate_table():
+    async with engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.drop_all)
+        await conn.run_sync(SQLModel.metadata.create_all)
+
+
+async def get_session() -> AsyncIterator[AsyncSession]:
+    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async with async_session() as session:
         yield session
+
+
+async def close_session():
+    global engine
+    if engine is None:
+        raise Exception("DatabaseSessionManager is not initialized")
+    await engine.dispose()
